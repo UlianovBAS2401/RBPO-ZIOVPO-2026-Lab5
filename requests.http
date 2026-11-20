@@ -1,0 +1,237 @@
+@baseUrl = http://localhost:8080
+
+### 1. Login
+# @name loginStep1
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "ivanov",
+  "password": "User@12345",
+  "deviceId": "client-desktop-01"
+}
+
+@accessToken1 = {{loginStep1.response.body.accessToken}}
+@refreshToken1 = {{loginStep1.response.body.refreshToken}}
+
+### 2. Access protected endpoint
+GET {{baseUrl}}/api/premises
+Authorization: Bearer {{accessToken1}}
+
+### 2.1. Current user
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken1}}
+
+### 3. Refresh token
+# @name refreshStep3
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken1}}"
+}
+
+@accessToken2 = {{refreshStep3.response.body.accessToken}}
+@refreshToken2 = {{refreshStep3.response.body.refreshToken}}
+
+### 3.1. Access protected endpoint with new token
+GET {{baseUrl}}/api/premises
+Authorization: Bearer {{accessToken2}}
+
+### 4. Reuse old refresh token (401)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken1}}"
+}
+
+### 5. Send revoked refresh token (401)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken1}}"
+}
+
+### 5.1. Access with active token
+GET {{baseUrl}}/api/premises
+Authorization: Bearer {{accessToken2}}
+
+### 6. Register
+# @name registerUser
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "kuznetsov",
+  "password": "Secure@Pass2026",
+  "fullName": "Кузнецов Дмитрий Иванович",
+  "email": "kuznetsov@example.com",
+  "phone": "+79998887766",
+  "deviceId": "client-mobile-01"
+}
+
+@newAccessToken = {{registerUser.response.body.accessToken}}
+@newRefreshToken = {{registerUser.response.body.refreshToken}}
+
+### 6.1. Access with registered user token
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{newAccessToken}}
+
+### 7. Login invalid password (401)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "ivanov",
+  "password": "WrongPassword!"
+}
+
+### 8. Login blocked user (401)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "sidorova",
+  "password": "User@12345"
+}
+
+### 9. Login empty fields (400)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "",
+  "password": ""
+}
+
+### 10. Refresh empty token (400)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": ""
+}
+
+### 11. Refresh invalid token (401)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "invalid.jwt.token"
+}
+
+### 12. Refresh with access token (401)
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{accessToken1}}"
+}
+
+### 13. Protected endpoint with refresh token (401)
+GET {{baseUrl}}/api/premises
+Authorization: Bearer {{refreshToken2}}
+
+### 14. Protected endpoint without token (401)
+GET {{baseUrl}}/api/premises
+
+### 15. Register duplicate username (409)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "ivanov",
+  "password": "Secure@Pass2026",
+  "fullName": "Иванов Иван Дубль",
+  "email": "ivanov_dup@example.com"
+}
+
+### 16. Register weak password (400)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "username": "weakuser",
+  "password": "123",
+  "fullName": "Слабый Пароль",
+  "email": "weak@example.com"
+}
+
+### 17. Admin login
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Admin@12345"
+}
+
+@adminAccessToken = {{adminLogin.response.body.accessToken}}
+
+### 18. Operator login
+# @name operatorLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "operator",
+  "password": "Operator@12345"
+}
+
+@operatorAccessToken = {{operatorLogin.response.body.accessToken}}
+
+### 19. Admin get users
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{adminAccessToken}}
+
+### 20. User get users (403)
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{accessToken2}}
+
+### 21. User get premises
+GET {{baseUrl}}/api/premises
+Authorization: Bearer {{accessToken2}}
+
+### 22. Operator get premises
+GET {{baseUrl}}/api/premises
+Authorization: Bearer {{operatorAccessToken}}
+
+### 23. User create meter reading
+POST {{baseUrl}}/api/meter-readings
+Authorization: Bearer {{accessToken2}}
+Content-Type: application/json
+
+{
+  "meterId": 1,
+  "period": "2026-11",
+  "readingValue": 155.000
+}
+
+### 24. Operator verify reading
+POST {{baseUrl}}/api/meter-readings/1/verify?status=VERIFIED
+Authorization: Bearer {{operatorAccessToken}}
+
+### 25. Operator calculate charge
+POST {{baseUrl}}/api/utility-charges/calculate?meterId=1&period=2026-10
+Authorization: Bearer {{operatorAccessToken}}
+
+### 26. Admin unblock user
+PATCH {{baseUrl}}/api/users/3/status
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+
+{
+  "status": "ACTIVE"
+}
+
+### 27. Unblocked user login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "sidorova",
+  "password": "User@12345"
+}
